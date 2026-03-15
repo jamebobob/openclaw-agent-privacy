@@ -1,0 +1,15 @@
+{
+  "_comment": "Add this to your openclaw.json under plugins.entries.openclaw-mem0.config",
+  "_requires": "openclaw-mem0-multi-pool patch applied to @mem0/openclaw-mem0",
+
+  "agentMemory": {
+    "main": {
+      "capture": "private",
+      "recall": ["private", "shared"]
+    },
+    "social": {
+      "capture": "shared",
+      "recall": ["shared"]
+    }
+  }
+}

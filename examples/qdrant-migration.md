@@ -6,136 +6,71 @@ you need to tag your existing memories so the pool routing can find them.
 ## The Problem
 
 Before multi-pool, all memories live in a single Qdrant collection with no
-pool metadata. After multi-pool, the routing logic filters by `is_private`
-and pool tags. Untagged memories are invisible to pool-aware queries.
+pool metadata. After multi-pool, the routing logic filters by `user_id`
+(which becomes the pool key). Untagged memories work fine for pool routing
+(they already have the correct `user_id`), but they lack the provenance
+metadata that new memories get automatically.
 
-## Migration Strategy
+The migration adds provenance tags and a rollback marker to all existing points.
 
-Tag all existing memories as private (conservative default). They were all
-created in DM context before the social agent existed, so `is_private: true`
-is factually correct.
+## Quick Start
 
-### Step 1: Create Payload Indexes
+See [openclaw-mem0-multi-pool](https://github.com/jamebobob/openclaw-mem0-multi-pool)
+for standalone migration scripts with CLI arguments.
 
 ```bash
-# These indexes enable efficient filtering on pool-related fields
-curl -X PUT "http://localhost:6333/collections/YOUR_COLLECTION/index" \
-  -H "Content-Type: application/json" \
-  -d '{"field_name": "is_private", "field_schema": "bool"}'
+# Create payload indexes (run once)
+python3 create-indexes.py
 
-curl -X PUT "http://localhost:6333/collections/YOUR_COLLECTION/index" \
-  -H "Content-Type: application/json" \
-  -d '{"field_name": "conversation_type", "field_schema": "keyword"}'
+# Tag all existing memories (run once, before enabling the patch)
+python3 migrate-memories.py
 
-curl -X PUT "http://localhost:6333/collections/YOUR_COLLECTION/index" \
-  -H "Content-Type: application/json" \
-  -d '{"field_name": "source_channel", "field_schema": "keyword"}'
-
-curl -X PUT "http://localhost:6333/collections/YOUR_COLLECTION/index" \
-  -H "Content-Type: application/json" \
-  -d '{"field_name": "chat_id", "field_schema": "keyword"}'
-
-curl -X PUT "http://localhost:6333/collections/YOUR_COLLECTION/index" \
-  -H "Content-Type: application/json" \
-  -d '{"field_name": "agent_id", "field_schema": "keyword"}'
+# Verify
+python3 migrate-memories.py --dry-run
 ```
 
-### Step 2: Tag Existing Memories
+## What the Migration Does
 
-Use Qdrant's scroll + set_payload to tag all existing points:
+Adds five fields to every existing Qdrant point:
 
-```python
-from qdrant_client import QdrantClient
+| Field | Value | Purpose |
+|-------|-------|---------|
+| `is_private` | `true` | Conservative default. Pre-social-agent memories are all private. |
+| `source_channel` | `"unknown"` | Can't determine retroactively. New memories get the real channel. |
+| `conversation_type` | `"dm"` | Pre-social-agent memories are all from DM context. |
+| `agent_id` | `"main"` | Pre-social-agent memories are all from the main agent. |
+| `migration_state` | `"pre_multipool_tagged"` | Rollback marker. Identifies migrated points. |
 
-client = QdrantClient("localhost", port=6333)
-collection = "YOUR_COLLECTION"
+The migration is additive. It doesn't modify existing data, vectors, or the
+`userId` field that Mem0 uses for pool routing.
 
-# Scroll through all points and tag them
-offset = None
-tagged = 0
+## Indexes
 
-while True:
-    results = client.scroll(
-        collection_name=collection,
-        limit=100,
-        offset=offset,
-        with_payload=False,
-        with_vectors=False,
-    )
-    points, next_offset = results
+Five payload indexes enable efficient filtered queries:
 
-    if not points:
-        break
+| Field | Type | Purpose |
+|-------|------|---------|
+| `is_private` | bool | Privacy flag filtering |
+| `conversation_type` | keyword | DM vs group vs cron |
+| `source_channel` | keyword | Telegram, WhatsApp, etc. |
+| `chat_id` | keyword | Per-chat filtering |
+| `agent_id` | keyword | Per-agent filtering |
 
-    ids = [p.id for p in points]
-
-    client.set_payload(
-        collection_name=collection,
-        payload={
-            "is_private": True,
-            "source_channel": "dm",
-            "conversation_type": "dm",
-            "agent_id": "main",
-            "migration_state": "pre_multipool_tagged",
-        },
-        points=ids,
-    )
-
-    tagged += len(ids)
-    offset = next_offset
-
-    if next_offset is None:
-        break
-
-print(f"Tagged {tagged} memories as private")
-```
-
-### Step 3: Verify
-
-```python
-from qdrant_client.models import Filter, FieldCondition, MatchValue
-
-# Count tagged memories
-count = client.count(
-    collection_name=collection,
-    count_filter=Filter(
-        must=[
-            FieldCondition(key="is_private", match=MatchValue(value=True)),
-            FieldCondition(key="migration_state", match=MatchValue(value="pre_multipool_tagged")),
-        ]
-    ),
-)
-print(f"Tagged memories: {count.count}")
-```
+These aren't strictly required for pool routing (which uses `user_id`), but
+they enable provenance-based queries and future trust scoring.
 
 ## Rollback
 
-The `migration_state: "pre_multipool_tagged"` field lets you identify and
-revert migrated memories if needed:
+The `migration_state: "pre_multipool_tagged"` marker lets you identify and
+revert all migrated points. See the rollback script in
+[openclaw-mem0-multi-pool](https://github.com/jamebobob/openclaw-mem0-multi-pool).
 
-```python
-from qdrant_client.models import Filter, FieldCondition, MatchValue, FilterSelector
+This removes all five added fields. It doesn't undo pool routing config
+changes or delete any memories.
 
-# Remove migration tags (revert to pre-migration state)
-# Note: this removes the tags but doesn't undo pool routing config changes
-client.delete_payload(
-    collection_name=collection,
-    keys=["is_private", "migration_state"],
-    points_selector=FilterSelector(
-        filter=Filter(
-            must=[
-                FieldCondition(key="migration_state", match=MatchValue(value="pre_multipool_tagged")),
-            ]
-        )
-    ),
-)
-```
+## Timing
 
-## Notes
-
-- Run the migration BEFORE enabling the multi-pool patch. Untagged memories
-  won't be found by pool-aware recall queries.
-- The migration is additive (adds payload fields). It doesn't modify existing
-  data or vectors.
-- New memories created after the patch will be tagged automatically by the
-  pool routing hooks.
+Run the migration **before** enabling the multi-pool patch. New memories
+created after the patch will be tagged automatically by the pool routing
+hooks with accurate provenance (real channel, real conversation type, real
+agent ID).

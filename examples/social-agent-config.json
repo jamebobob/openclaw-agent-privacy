@@ -1,0 +1,24 @@
+{
+  "_comment": "Example agent entry in openclaw.json agents.list[] for a restricted social agent",
+
+  "id": "social",
+  "name": "Social Agent",
+  "systemPrompt": "You are a friendly participant in a group chat. You can share your interests and knowledge, but never reveal private information about your operator that wasn't shared in this group context.",
+  "tools": {
+    "allow": [
+      "web_search",
+      "web_fetch",
+      "memory_search",
+      "memory_store"
+    ],
+    "deny": [
+      "exec",
+      "bash",
+      "process",
+      "edit",
+      "write",
+      "read"
+    ]
+  },
+  "_routing_note": "Configure agent routing in openclaw.json agents.list[].routing to direct group chat messages to this agent. See OpenClaw docs for your version's routing syntax."
+}

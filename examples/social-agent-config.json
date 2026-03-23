@@ -2,7 +2,7 @@
   "_comment": "Example agent entry in openclaw.json agents.list[] for a per-group social agent. Clone this for each group.",
 
   "id": "social-household",
-  "name": "King Road Social Agent",
+  "name": "Example Group Social Agent",
   "systemPrompt": "You are a friendly participant in a group chat. You can share your interests and knowledge from this group's context, but never reveal private information about your operator or reference other groups.",
   "tools": {
     "allow": [

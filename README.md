@@ -34,24 +34,17 @@ Privacy isn't a single feature. It's four layers that reinforce each other. Each
 
 ### Layer 1: Memory Pool Isolation
 
-Each social agent gets its own memory pool. Capture and recall are per-group:
+Each social agent gets its own memory pool. Capture and recall are per-group, derived from the agent's naming convention — no config file to maintain:
 
-```json
-{
-  "agentMemory": {
-    "main": { "capture": "operator", "recall": ["operator", "household", "friends", "family", "parents", "partner"] },
-    "social-household": { "capture": "household", "recall": ["household"] },
-    "social-friends": { "capture": "friends", "recall": ["friends"] },
-    "social-family": { "capture": "family", "recall": ["family"] },
-    "social-parents": { "capture": "parents", "recall": ["parents"] },
-    "social-partner": { "capture": "partner", "recall": ["partner"] }
-  }
-}
-```
+- **agentId `"main"`:** Unrestricted. Sees all pools (operator access).
+- **agentId starting with `"social-"`:** Strips the prefix to derive the pool name. `social-friends` captures to and recalls from the `friends` pool only. Results tagged `is_private` are dropped.
+- **Any other agentId:** Fail-closed. Returns empty results.
+
+New agents just work if they follow the naming convention. No config entry needed.
 
 Your main agent sees everything. Each social agent sees only its group's memories. This is enforced in the plugin hooks, not by asking the model nicely.
 
-The enforcement chain is fail-closed: the config parser rejects invalid entries (`SKIPPING`), `getCapturePool`/`getRecallPools` return `undefined`/`[]` for unmapped agents, provenance tags `is_private` from `conversationType` only, and the recall guard filters by `is_private`. No fallback to a default pool. No "try the global pool instead." If the config doesn't explicitly grant access, access doesn't exist.
+The enforcement chain is fail-closed: `getCapturePool`/`getRecallPools` derive the pool from the `agentId` prefix (or return `undefined`/`[]` for unrecognized agents), provenance tags `is_private` from `conversationType` only, and the recall guard drops `is_private` results for social agents. No fallback to a default pool. No "try the global pool instead." If the naming convention doesn't match, access doesn't exist.
 
 Reference: [mem0-vigil](https://github.com/jamebobob/mem0-vigil) fork.
 
@@ -196,7 +189,6 @@ provision-group.sh -1009876543210 uncle-bob
 What it creates:
 - Agent entry (cloned from template)
 - Binding (routes the group chat to the new agent)
-- Pool config (agentMemory entry with capture/recall)
 - Group entry in the groups list
 - Exec-approvals entry (`python3` only)
 - Workspace directory (`~/.openclaw/workspace-social-{suffix}/`)
@@ -228,11 +220,11 @@ The attack literature (MEXTRA, MINJA, MemoryGraft) makes a straightforward case:
 | kevyn-noocar/openclaw-mem0-per-agent | 1:1 silos | No | userId remap | No | No |
 | MemTensor multiAgentMode | 1:1 silos | No | agentId inject | No | No |
 | RyanLisse/engram | Scope memberships | Yes (scope model) | Join table | No | No |
-| **This framework** | **N:M per-group** | **Yes** | **Config + code + fail-closed** | **Yes** | **Yes** |
+| **This framework** | **N:M per-group** | **Yes** | **Convention + code + fail-closed** | **Yes** | **Yes** |
 
 ## Implementation
 
-The memory isolation layer lives in the [mem0-vigil](https://github.com/jamebobob/mem0-vigil) fork of mem0ai/mem0. Four targeted patches form a fail-closed chain: config parser rejects invalid pool entries, pool routing returns `undefined`/`[]` for unmapped agents, provenance tags `is_private` from conversation type only, and the recall guard default config removes `allowed_pools` (pool routing is the isolation layer). See the fork for the specific commits.
+The memory isolation layer lives in the [mem0-vigil](https://github.com/jamebobob/mem0-vigil) fork of mem0ai/mem0. Pool routing is convention-based: the `agentId` prefix determines pool access at runtime. `main` sees all pools, `social-*` agents see only their derived pool (with `is_private` results dropped), and unrecognized agents get empty results. No config file to maintain. See the fork for the specific commits.
 
 The prompt-level layer is a set of configuration patterns: systemPrompt rules, AGENTS.md memory handling guidelines, per-agent USER.md files, and sticky-context sensitive redaction. Reference configs are in [`examples/`](examples/).
 
@@ -254,7 +246,7 @@ Pool routing solves which memories each agent can access. Five companion project
 1. **Default-private, explicit elevation.** Everything is private unless the source context proves otherwise.
 2. **Policy at retrieval, not storage.** Store everything. Filter what surfaces based on who's asking and where.
 3. **No pool labels in output.** The model doesn't need to know which pool a memory came from. Filtering already happened. Labels are a leakage vector.
-4. **Fail closed.** Missing config means no access. Not default access.
+4. **Fail closed.** Unrecognized agent naming means no access. Not default access.
 5. **Four layers, not one.** Memory isolation holds the line. Boot isolation sets per-audience context. Tool isolation restricts capabilities. Behavioral defense provides judgment. Each covers gaps the others can't.
 6. **One group, one pool, one workspace.** Isolation is the default. Sharing is explicit and operator-controlled.
 
@@ -262,7 +254,7 @@ Pool routing solves which memories each agent can access. Five companion project
 
 This framework is currently deployed on OpenClaw + Mem0/Qdrant, but the patterns are portable to any multi-agent system with pluggable memory.
 
-1. **Start with memory isolation.** Deploy the [mem0-vigil](https://github.com/jamebobob/mem0-vigil) fork with per-group `agentMemory` config. Each social agent gets its own capture pool and a single-entry recall list.
+1. **Start with memory isolation.** Deploy the [mem0-vigil](https://github.com/jamebobob/mem0-vigil) fork. Pool routing is convention-based: name your agents `social-{pool}` and they automatically capture to and recall from their derived pool.
 2. **Add workspace isolation.** Create per-agent workspace directories (`~/.openclaw/workspace-{agentId}/`). Write audience-appropriate USER.md for each group. Symlink SOUL.md and memory/ from the main workspace.
 3. **Add tool isolation.** Install [openclaw-read-guardrail](https://github.com/jamebobob/openclaw-read-guardrail) for dynamic read enforcement. Configure exec-approvals (`python3` only) and tool deny lists per social agent.
 4. **Write your behavioral layer.** systemPrompt rules, AGENTS.md memory handling guidelines. See [`examples/`](examples/) for reference configs.

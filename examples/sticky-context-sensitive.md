@@ -2,12 +2,12 @@
 
 The [openclaw-sticky-context](https://github.com/jamebobob/openclaw-sticky-context) plugin
 supports a `sensitive: true` flag on slots. Sensitive slots are automatically redacted
-before being injected into lower-trust agents (like your social agent).
+before being injected into lower-trust agents (like your social-* agents).
 
 ## Example: Identity Anchor
 
 Your main agent needs operational details (IP, location, infrastructure) to do its job.
-Your social agent should NOT see these details.
+Your social-* agents should NOT see these details.
 
 ### Setting the slot
 
@@ -18,10 +18,10 @@ sticky_set("identity-anchor", "I'm [name]. AI on [server]. Human: [operator], [l
 ### What the main agent sees (unredacted)
 
 ```
-I'm Assistant. AI on HomeServer (192.168.1.100). Human: Alex (he/him), Portland OR. Primary channel: Telegram.
+I'm Assistant. AI on HomeServer (10.0.0.100). Human: Alex (he/him), Portland OR. Primary channel: Telegram.
 ```
 
-### What the social agent sees (redacted)
+### What social-* agents see (redacted)
 
 ```
 I'm Assistant. AI on HomeServer ([REDACTED]). Human: Alex (he/him), [REDACTED]. Primary channel: Telegram.
@@ -30,7 +30,7 @@ I'm Assistant. AI on HomeServer ([REDACTED]). Human: Alex (he/him), [REDACTED]. 
 ## Redaction Patterns
 
 The default redaction targets:
-- IPv4 addresses (`192.168.x.x`, `10.x.x.x`, etc.)
+- IPv4 addresses (`10.x.x.x`, `172.16.x.x`, etc.)
 - API keys and tokens (common patterns)
 - SSH connection strings
 - Port numbers in sensitive contexts

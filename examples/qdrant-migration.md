@@ -1,5 +1,7 @@
 # Qdrant Migration Guide
 
+> **For new deployments** using the [mem0-vigil](https://github.com/jamebobob/mem0-vigil) fork, migration scripts are included in the fork repo. This guide is primarily useful for upgrading existing single-pool or two-pool setups to per-group isolation.
+
 If you're adding multi-pool routing to an existing Qdrant-backed Mem0 setup,
 you need to tag your existing memories so the pool routing can find them.
 
@@ -15,7 +17,7 @@ The migration adds provenance tags and a rollback marker to all existing points.
 
 ## Quick Start
 
-See [openclaw-mem0-multi-pool](https://github.com/jamebobob/openclaw-mem0-multi-pool)
+See [mem0-vigil](https://github.com/jamebobob/mem0-vigil)
 for standalone migration scripts with CLI arguments.
 
 ```bash
@@ -63,7 +65,7 @@ they enable provenance-based queries and future trust scoring.
 
 The `migration_state: "pre_multipool_tagged"` marker lets you identify and
 revert all migrated points. See the rollback script in
-[openclaw-mem0-multi-pool](https://github.com/jamebobob/openclaw-mem0-multi-pool).
+[mem0-vigil](https://github.com/jamebobob/mem0-vigil).
 
 This removes all five added fields. It doesn't undo pool routing config
 changes or delete any memories.

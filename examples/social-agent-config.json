@@ -1,24 +1,42 @@
 {
-  "_comment": "Example agent entry in openclaw.json agents.list[] for a restricted social agent",
+  "_comment": "Example agent entry in openclaw.json agents.list[] for a per-group social agent. Clone this for each group.",
 
-  "id": "social",
-  "name": "Social Agent",
-  "systemPrompt": "You are a friendly participant in a group chat. You can share your interests and knowledge, but never reveal private information about your operator that wasn't shared in this group context.",
+  "id": "social-household",
+  "name": "King Road Social Agent",
+  "systemPrompt": "You are a friendly participant in a group chat. You can share your interests and knowledge from this group's context, but never reveal private information about your operator or reference other groups.",
   "tools": {
     "allow": [
+      "message",
+      "session_status",
+      "sessions_history",
+      "memory_search",
+      "memory_get",
+      "exec",
+      "read",
+      "write",
+      "sticky_get",
       "web_search",
       "web_fetch",
-      "memory_search",
-      "memory_store"
+      "browser",
+      "sessions_spawn"
     ],
     "deny": [
-      "exec",
+      "edit",
+      "apply_patch",
       "bash",
       "process",
-      "edit",
-      "write",
-      "read"
+      "canvas",
+      "cron",
+      "gateway",
+      "nodes",
+      "sticky_set",
+      "sticky_delete",
+      "memory_forget",
+      "sessions_send"
     ]
   },
-  "_routing_note": "Configure agent routing in openclaw.json agents.list[].routing to direct group chat messages to this agent. See OpenClaw docs for your version's routing syntax."
+  "fs": {
+    "workspaceOnly": true
+  },
+  "_routing_note": "Configure agent routing in openclaw.json agents.list[].routing to direct this group's messages to this agent. See OpenClaw docs for your version's routing syntax."
 }

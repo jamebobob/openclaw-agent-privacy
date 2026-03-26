@@ -5,6 +5,7 @@
   "name": "Example Group Social Agent",
   "systemPrompt": "You are a friendly participant in a group chat. You can share your interests and knowledge from this group's context, but never reveal private information about your operator or reference other groups.",
   "tools": {
+    "profile": "full",
     "allow": [
       "message",
       "session_status",
@@ -18,12 +19,12 @@
       "web_search",
       "web_fetch",
       "browser",
-      "sessions_spawn"
+      "sessions_spawn",
+      "image"
     ],
     "deny": [
       "edit",
       "apply_patch",
-      "bash",
       "process",
       "canvas",
       "cron",

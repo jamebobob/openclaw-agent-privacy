@@ -57,7 +57,9 @@ The critical file is **USER.md** — unique per group, containing audience-appro
 Other workspace files:
 - **IDENTITY.md**, **AGENTS.md**, **TOOLS.md**, **MEMORY.md** — copied from template
 - **SOUL.md** — symlinked to main workspace (identity propagates across all agents)
-- **memory/** — symlinked to main workspace (native search shared)
+- **memory/** — real directory per agent (not a symlink; see warning below)
+
+> **WARNING: Do NOT symlink `memory/` to a shared directory.** OpenClaw's memory indexer skips symlinks ([openclaw/openclaw#23619](https://github.com/openclaw/openclaw/issues/23619)). If `memory/` is a symlink, `memory_search` returns no results for that agent. Each social agent needs its own real `memory/` directory. The indexer CLI also requires `--agent <id>` to index non-default agents. Your cron job should index all agents, not just the default.
 
 Boot files load at session start only. Mid-session changes are invisible until `/new`. This creates a constraint: how do you update a social agent's context without restarting its session?
 
@@ -67,15 +69,21 @@ Boot files load at session start only. Mid-session changes are invisible until `
 
 Multiple enforcement mechanisms, each covering a different surface:
 
-**Read-guardrail:** Dynamic per-agent workspace root derived from `agentId` at runtime. `social-partner` reads `workspace-social-partner/` and `/tmp/`. It cannot read `workspace-social-family/`. See [openclaw-read-guardrail](https://github.com/jamebobob/openclaw-read-guardrail).
+**Read-guardrail:** Dynamic per-agent workspace root derived from `agentId` at runtime. `social-partner` reads `workspace-social-partner/` and `/tmp/`. It cannot read `workspace-social-family/`. See [openclaw-read-guardrail](https://github.com/jamebobob/openclaw-read-guardrail). **Important:** read-guardrail intercepts `read`, `image`, `pdf`, and `diffs` tools only. It does NOT intercept `exec`. When an agent runs a command via `exec` (e.g., `python3 /path/to/script.py`), the executed process reads files through the OS kernel, bypassing the read-guardrail entirely. Use exec-approvals to restrict which binaries social agents can execute.
 
 **Privacy-guardrail:** Write path enforcement for public surfaces. Not per-agent — it prevents any agent from writing sensitive content to public-facing paths. See [openclaw-privacy-guardrail](https://github.com/jamebobob/openclaw-privacy-guardrail).
 
-**Exec-approvals:** `python3` only per social agent. No shell, no node, no arbitrary execution.
+**Exec-approvals:** `python3` only per social agent. No shell, no node, no arbitrary execution. This is the security boundary for exec, not the read-guardrail.
 
-**Tool allow/deny:** 13 allowed (`message`, `session_status`, `sessions_history`, `memory_search`, `memory_get`, `exec`, `read`, `write`, `sticky_get`, `web_search`, `web_fetch`, `browser`, `sessions_spawn`), 12 denied (`edit`, `apply_patch`, `bash`, `process`, `canvas`, `cron`, `gateway`, `nodes`, `sticky_set`, `sticky_delete`, `memory_forget`, `sessions_send`).
+**Tool allow/deny:** 14 allowed (`message`, `session_status`, `sessions_history`, `memory_search`, `memory_get`, `exec`, `read`, `write`, `sticky_get`, `web_search`, `web_fetch`, `browser`, `sessions_spawn`, `image`), 11 denied (`edit`, `apply_patch`, `process`, `canvas`, `cron`, `gateway`, `nodes`, `sticky_set`, `sticky_delete`, `memory_forget`, `sessions_send`). See [`examples/social-agent-config.json`](examples/social-agent-config.json) for the reference template.
 
 **fs.workspaceOnly:** `true` — platform-level write enforcement. Social agents can only write within their workspace.
+
+> **WARNING: Tool configuration pitfalls**
+>
+> - **Do NOT add `bash` to social agent deny lists.** OpenClaw's `expandToolGroups()` treats `bash` as a legacy alias for `exec`. Since deny is evaluated before allow, `bash` in the deny list silently removes `exec` even when `exec` is explicitly in the allow list.
+> - **Do NOT use a global `tools.allow` in `openclaw.json` alongside per-agent `tools.allow`.** The global list runs earlier in the pipeline (Step 3) and removes tools before per-agent config can include them (Step 5). Use per-agent tools config exclusively.
+> - **Set `tools.profile` to `"full"` on each social agent.** Without an explicit profile, the allow list can only restrict the default tool set, not add tools the default doesn't include.
 
 **Known gap:** No per-agent write isolation hook equivalent to read-guardrail. A social agent can write within its own workspace but there's no dynamic enforcement preventing writes to another agent's workspace at the guardrail level — `fs.workspaceOnly` and the privacy-guardrail cover this at the platform level, but it's not as clean as the read side.
 
@@ -255,7 +263,7 @@ Pool routing solves which memories each agent can access. Five companion project
 This framework is currently deployed on OpenClaw + Mem0/Qdrant, but the patterns are portable to any multi-agent system with pluggable memory.
 
 1. **Start with memory isolation.** Deploy the [mem0-vigil](https://github.com/jamebobob/mem0-vigil) fork. Pool routing is convention-based: name your agents `social-{pool}` and they automatically capture to and recall from their derived pool.
-2. **Add workspace isolation.** Create per-agent workspace directories (`~/.openclaw/workspace-{agentId}/`). Write audience-appropriate USER.md for each group. Symlink SOUL.md and memory/ from the main workspace.
+2. **Add workspace isolation.** Create per-agent workspace directories (`~/.openclaw/workspace-{agentId}/`). Write audience-appropriate USER.md for each group. Symlink SOUL.md from the main workspace. Create a **real `memory/` directory** for each agent (do NOT symlink it; see warning below).
 3. **Add tool isolation.** Install [openclaw-read-guardrail](https://github.com/jamebobob/openclaw-read-guardrail) for dynamic read enforcement. Configure exec-approvals (`python3` only) and tool deny lists per social agent.
 4. **Write your behavioral layer.** systemPrompt rules, AGENTS.md memory handling guidelines. See [`examples/`](examples/) for reference configs.
 5. **Provision new groups.** Use `provision-group.sh` or equivalent automation to avoid manual config editing.

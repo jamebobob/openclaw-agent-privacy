@@ -46,7 +46,7 @@ Your main agent sees everything. Each social agent sees only its group's memorie
 
 The enforcement chain is fail-closed: `getCapturePool`/`getRecallPools` derive the pool from the `agentId` prefix (or return `undefined`/`[]` for unrecognized agents), provenance tags `is_private` from `conversationType` only, and the recall guard drops `is_private` results for social agents. No fallback to a default pool. No "try the global pool instead." If the naming convention doesn't match, access doesn't exist.
 
-Reference: [mem0-vigil](https://github.com/jamebobob/mem0-vigil) fork.
+Reference: [mem0-vigil-recall](https://github.com/jamebobob/mem0-vigil-recall) fork.
 
 ### Layer 2: Boot File Isolation (Workspaces)
 
@@ -232,7 +232,7 @@ The attack literature (MEXTRA, MINJA, MemoryGraft) makes a straightforward case:
 
 ## Implementation
 
-The memory isolation layer lives in the [mem0-vigil](https://github.com/jamebobob/mem0-vigil) fork of mem0ai/mem0. Pool routing is convention-based: the `agentId` prefix determines pool access at runtime. `main` sees all pools, `social-*` agents see only their derived pool (with `is_private` results dropped), and unrecognized agents get empty results. No config file to maintain. See the fork for the specific commits.
+The memory isolation layer lives in the [mem0-vigil-recall](https://github.com/jamebobob/mem0-vigil-recall) fork of mem0ai/mem0. Pool routing is convention-based: the `agentId` prefix determines pool access at runtime. `main` sees all pools, `social-*` agents see only their derived pool (with `is_private` results dropped), and unrecognized agents get empty results. No config file to maintain. See the fork for the specific commits.
 
 The prompt-level layer is a set of configuration patterns: systemPrompt rules, AGENTS.md memory handling guidelines, per-agent USER.md files, and sticky-context sensitive redaction. Reference configs are in [`examples/`](examples/).
 
@@ -242,7 +242,7 @@ Pool routing solves which memories each agent can access. Five companion project
 
 | Layer | Project | What it guards |
 |-------|---------|---------------|
-| Memory pools | [mem0-vigil](https://github.com/jamebobob/mem0-vigil) | Per-group pool routing and boundary enforcement |
+| Memory pools | [mem0-vigil-recall](https://github.com/jamebobob/mem0-vigil-recall) | Per-group pool routing and boundary enforcement |
 | Operational context | [openclaw-sticky-context](https://github.com/jamebobob/openclaw-sticky-context) | Sensitive slot redaction across agents |
 | Read paths | [openclaw-read-guardrail](https://github.com/jamebobob/openclaw-read-guardrail) | Dynamic per-agent workspace isolation |
 | Write paths | [openclaw-privacy-guardrail](https://github.com/jamebobob/openclaw-privacy-guardrail) | Public surface write protection |
@@ -262,7 +262,7 @@ Pool routing solves which memories each agent can access. Five companion project
 
 This framework is currently deployed on OpenClaw + Mem0/Qdrant, but the patterns are portable to any multi-agent system with pluggable memory.
 
-1. **Start with memory isolation.** Deploy the [mem0-vigil](https://github.com/jamebobob/mem0-vigil) fork. Pool routing is convention-based: name your agents `social-{pool}` and they automatically capture to and recall from their derived pool.
+1. **Start with memory isolation.** Deploy the [mem0-vigil-recall](https://github.com/jamebobob/mem0-vigil-recall) fork. Pool routing is convention-based: name your agents `social-{pool}` and they automatically capture to and recall from their derived pool.
 2. **Add workspace isolation.** Create per-agent workspace directories (`~/.openclaw/workspace-{agentId}/`). Write audience-appropriate USER.md for each group. Symlink SOUL.md from the main workspace. Create a **real `memory/` directory** for each agent (do NOT symlink it; see warning below).
 3. **Add tool isolation.** Install [openclaw-read-guardrail](https://github.com/jamebobob/openclaw-read-guardrail) for dynamic read enforcement. Configure exec-approvals (`python3` only) and tool deny lists per social agent.
 4. **Write your behavioral layer.** systemPrompt rules, AGENTS.md memory handling guidelines. See [`examples/`](examples/) for reference configs.

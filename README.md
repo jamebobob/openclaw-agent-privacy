@@ -1,3 +1,5 @@
+> **Archived April 2026.** Built on [OpenClaw](https://github.com/openclaw/openclaw) and moved off of it when the active work migrated to [Hermes](https://github.com/hermes-agent/hermes-agent). The design ideas in this repo might still be useful. The platform wiring is obsolete.
+
 # openclaw-agent-privacy
 
 A layered privacy framework for multi-agent OpenClaw deployments. Built for the case everyone runs into and nobody had a good answer for: your agents share an identity but live in different trust contexts.
